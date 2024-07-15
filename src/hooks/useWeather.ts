@@ -1,6 +1,8 @@
 import axios from "axios"
 import { z } from "zod"
+//import {object,string,number,InferOutput,parse} from "valibot"
 import { SearchType } from "../types";
+import { useMemo, useState } from "react";
 
 
 // function isWeatherResponse(weather: unknown) : weather is Weather {
@@ -13,6 +15,7 @@ import { SearchType } from "../types";
 //         typeof (weather as Weather).main.temp_min==='number' 
 //     )
 // }
+//zod
 const Weather = z.object({
     name: z.string(),
     main: z.object({
@@ -21,17 +24,40 @@ const Weather = z.object({
         temp_min: z.number()
     })
 })
-type Weather = z.infer<typeof Weather>
+export type Weather = z.infer<typeof Weather>
+
+
+// //valibot 
+// const WeatherSchema = object({
+//     name: string(),
+//     main: object({
+//         temp: number(),
+//         temp_max: number(),
+//         temp_min: number()
+//     })
+// })
+// type Weather = InferOutput<typeof WeatherSchema>
 export default function useWeather() {
+
+    const [weather, setWeather] = useState<Weather>({
+        name: '',
+        main: {
+            temp: 0,
+            temp_max: 0,
+            temp_min: 0
+        }
+    } )
+    const [loading, setLoading] = useState(false)
     const fetchWeather = async (search: SearchType) => {
         const appId = import.meta.env.VITE_API_KEY;
+        setLoading(true)
         try {
             const geoURL = `http://api.openweathermap.org/geo/1.0/direct?q=${search.city},${search.country}&appid=${appId}`;
 
             const { data } = await axios(geoURL);
             const lat = data[0].lat;
             const lon = data[0].lon;
-            const wheatherURL = `http://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${appId}`;
+            const weatherURL = `http://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${appId}`;
 
             //castear el type
             // const {data:weather}=await axios<Weather>(wheatherURL);
@@ -45,19 +71,35 @@ export default function useWeather() {
             // }
 
             //Zod
-            const { data: weather } = await axios(wheatherURL);
-            const result = Weather.safeParse(weather);
-            if (result.success) {
-                console.log(weather.name)
+            const {data: weatherResult} = await axios(weatherURL)
+            const result = Weather.safeParse(weatherResult)
+            if(result.success) {
+                setWeather(result.data)
             }
+            // //valibot
+
+            // const { data: weather } = await axios<Weather>(wheatherURL);
+            // const result= parse(WeatherSchema,weather);
+            // if(result){
+            //     console.log(result)
+                
+            // }
 
 
         } catch (error) {
             console.log('Error fetching weather:', error);
         }
+        finally {
+            setLoading(false)
+        }
+
     }
+    const hasWeatherData=useMemo(() => weather.name ,[weather])
 
     return {
-        fetchWeather
+        weather,
+        loading,
+        fetchWeather,
+        hasWeatherData
     }
 }
